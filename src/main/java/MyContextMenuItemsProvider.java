@@ -10,7 +10,6 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class MyContextMenuItemsProvider implements ContextMenuItemsProvider
 {
@@ -32,26 +31,37 @@ public class MyContextMenuItemsProvider implements ContextMenuItemsProvider
 
         if (event.isFromTool(ToolType.TARGET))
         {
-            JMenuItem item = new JMenuItem("Fetch empty response");
-            item.addActionListener(l -> {
-                List<HttpRequestResponse> requestResponses = event.selectedRequestResponses();
+            JMenuItem emptyResponses = new JMenuItem("Fetch empty response(s)");
+            emptyResponses.addActionListener(l -> {
+                List<HttpRequestResponse> requestResponses = event.messageEditorRequestResponse().isPresent()
+                        ? List.of(event.messageEditorRequestResponse().get().requestResponse())
+                        : event.selectedRequestResponses();
 
-                for (HttpRequestResponse requestResponse : requestResponses)
-                {
-                    if (requestResponse.response() == null)
-                    {
-                        executorService.execute(() -> {
-                            HttpRequestResponse issuedRequestResponse = http.sendRequest(requestResponse.request());
-
-                            siteMap.add(issuedRequestResponse);
-                        });
-                    }
-                }
+                performAction(requestResponses);
             });
 
-            components.add(item);
+            JMenuItem allResponses = new JMenuItem("Fetch all empty responses");
+            allResponses.addActionListener(l -> performAction(siteMap.requestResponses()));
+
+            components.add(emptyResponses);
+            components.add(allResponses);
         }
 
         return components;
+    }
+
+    private void performAction(List<HttpRequestResponse> requestResponses)
+    {
+        for (HttpRequestResponse requestResponse : requestResponses)
+        {
+            if (requestResponse.response() == null)
+            {
+                executorService.execute(() -> {
+                    HttpRequestResponse issuedRequestResponse = http.sendRequest(requestResponse.request());
+
+                    siteMap.add(issuedRequestResponse);
+                });
+            }
+        }
     }
 }
